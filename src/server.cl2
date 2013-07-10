@@ -26,11 +26,11 @@
                 (swap! socket-clients
                        #(assoc % (:id conn#) conn#))
                 ~(when load-balancer-workaround?
-                   `(def timer# (do-interval
-                                 5000
-                                 (try
-                                   (.. conn# -_session -recv didClose)
-                                   (catch x nil)))))
+                   `(add-interval
+                     timer# 15000
+                     (try
+                       (.. conn# -_session -recv didClose)
+                       (catch x nil))))
                 (let [on-open
                       ~(or on-open
                            `(fn [_ conn]
@@ -43,8 +43,7 @@
                   (.on conn# "close"
                        (fn []
                          ~(when load-balancer-workaround?
-                            `(do (clearInterval timer#)
-                                 (set! timer# nil)))
+                            `(remove-interval timer#))
                          (swap! socket-clients
                                 #(dissoc % (:id conn#)))
                          (on-close conn#))))
