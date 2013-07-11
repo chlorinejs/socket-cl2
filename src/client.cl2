@@ -1,30 +1,90 @@
-(load-file "./shared.cl2")
-
 (defmacro defsocket
-  "Sets up a websocket/sockjs object, make it ready for def-socket-handler.
-  Socket-object can be a WebSocket or SockJS instance."
-  [socket-object & [{:keys [as on-open on-close]}]]
-  (let [conn# (or as (gensym "socket"))]
-    `(do
-       (def ~conn# ~socket-object)
-       (defn send-response
+  [socket-sym initializer & [{:keys [on-open on-close]}]]
+  `(def ~socket-sym
+     (do
+       ;;Todo: channels
+       (def socket-store (atom {:init ~initializer}))
+
+       (def status (atom :closed))
+
+       (def socket-handlers (atom {}))
+
+       (def rejected? (atom false))
+
+       (defn respond!
+         "Sends message to server."
          [msg-type data]
-         (. ~conn# (send (serialize [msg-type data]))))
+         (. (:instance @socket-store)
+            (send (serialize [msg-type data]))))
 
-       (set! (. ~conn# -emit) send-response)
+       (defn close!
+         "Close current socket instance"
+         (.close (:instance @socket-store)))
 
-       (set! (. ~conn# -onopen)
-             ~(or on-open
-                  `#(println "Welcome to socket")))
-       (set! (. ~conn# -onclose)
-             ~(or on-close
-                  `#(println "Socket: Goodbye!")))
-       (set! (. ~conn# -onmessage)
-             (fn [e]
-               (let [[msg-type data] (deserialize e.data)
-                     handler
-                     (or (get @socket-atom msg-type)
-                         (get @socket-atom :default)
-                         #(println "Unknown handler for data of type"
-                                   msg-type))]
-                 (handler msg-type data send-response ~conn#)))))))
+       (def on-open (or ~on-open
+                        #(println "Welcome to socket")))
+
+       (def on-close (or ~on-close
+                         #(println "Socket: Goodbye!")))
+
+       (defn on-message
+         "Decodes raw a message from server, finds and calls the
+  handler associated with the message type."
+         [e]
+         (let [[msg-type data] (deserialize e.data)
+               handler
+               (or (get @socket-handlers msg-type)
+                   (get @socket-handlers :default)
+                   #(println "Unknown handler for data of type"
+                             msg-type))]
+           (handler msg-type data respond!
+                    (:instance @socket-store))))
+
+       (defn connect!
+         "Creates a new websocket/sockjs, saves it to socket-store
+  and calls forge-socket! on it."
+         []
+         (println "Hmm... Trying to connect")
+         (swap! socket-store
+                #(assoc % :instance ((:init @socket-store))))
+         (forge-socket! (:instance @socket-store)))
+
+       (defn forge-socket!
+         "Associates a new websocket/sockjs instance with event
+  handlers."
+         [socket]
+         (set! (. socket -emit) respond!)
+
+         (set! (. socket -onopen)
+               (fn []
+                 (reset! status :opened)
+                 (on-open)))
+         (set! (. socket -onclose)
+               (fn []
+                 (reset! status :closed)
+                 (on-close)
+                 (when-not @rejected?
+                   (connect!))))
+         (set! (. socket -onmessage) on-message))
+
+       (connect!)
+
+       (defn add-handler
+         "Registers a handler to its intended message type."
+         [msg-type handler]
+         (swap! socket-handlers
+                #(assoc % msg-type handler)))
+
+       (add-handler "REJECTED"
+                    (fn [_ data]
+                      (reset! rejected? true)
+                      (println "Rejected: " data)
+                      (. (:instance @socket-store) close)))
+
+       {:on add-handler
+        :emit respond!
+        :close close!
+        :connect connect!
+        :store socket-store
+        :status status
+        :rejected? rejected?})))
