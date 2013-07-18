@@ -12,40 +12,6 @@ Pull contrib-cl2 to your machine:
 npm install socket-cl2
 ```
 
-## Client side
-```clojure
-;; socket-cl2 requires json.cl2
-(load-file "./path/to/node_modules/cl2-contrib/src/json.cl2")
-(load-file "./path/to/node_modules/socket-cl2/src/client.cl2")
-
-(defsocket (WebSocket.))
-;; or you may prefer sockjs to websocket
-;; (defsocket (SockJS.))
-
-(defn welcome-handler [conn msg-type data]
-  (. conn send :confirm "Got a welcome message.")
-(defsocket-handler :welcome welcome-handler))
-```
-
-## Server side (Nodejs + sockjs)
-```clojure
-;; socket-cl2 requires json.cl2
-(load-file "./path/to/node_modules/cl2-contrib/src/json.cl2")
-(load-file "./path/to/node_modules/socket-cl2/src/server.cl2")
-
-(require ["sockjs"])
-(def socket (. sockjs (createServer)))
-(defsocket socket)
-
-(defn init-handler
-  "Says welcome to clients."
-  [conn msg-type data]
-  (broadcast :new-client "Someone new" #{1 2})
-  (whisper   :welcome "You're welcome" conn.id))
-
-(defsocket-handler :init init-handler)
-```
-
 # License
 
 Copyright © 2013 Hoang Minh Thang
