@@ -7,11 +7,6 @@ Websocket/Sockjs wrappers/macros for ChlorineJS.
 Socket-Cl2 provides two major files: `client.cl2` and `server.cl2`.
 You may want to use one or both of them.
 
-Pull contrib-cl2 to your machine:
-```
-npm install socket-cl2
-```
-
 # License
 
 Copyright © 2013 Hoang Minh Thang
