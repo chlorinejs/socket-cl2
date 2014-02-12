@@ -76,7 +76,7 @@
                (fn []
                  (reset! status :connected)
                  ~(if on-open
-                    `(on-open)
+                    `(~on-open)
                     (when debug
                       `(println "Welcome to socket")))))
 
@@ -84,7 +84,7 @@
                (fn []
                  (reset! status :closed)
                  ~(if on-close
-                    `(on-close)
+                    `(~on-close)
                     (when debug
                       `(println "Socket: Goodbye!")))))
 
